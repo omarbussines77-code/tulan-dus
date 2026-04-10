@@ -2,92 +2,106 @@
 <html lang="az">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Neon Jump - Mənim Oyunum</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Moto Rider - Omar Aliyev</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        canvas { border-bottom: 4px solid #00f2ff; background: #050505; box-shadow: 0 0 20px rgba(0, 242, 255, 0.2); }
-        .score { position: absolute; top: 20px; color: #00f2ff; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #00f2ff; }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap');
+
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Orbitron', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; color: #fff; touch-action: none; }
+        
+        canvas { border-bottom: 3px solid #00f2ff; background: #000; box-shadow: 0 0 30px rgba(0, 242, 255, 0.2); display: block; }
+        
+        .ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 20px; box-sizing: border-box; }
+        
+        .author { position: absolute; top: 15px; left: 15px; font-size: 12px; color: rgba(255,255,255,0.7); text-shadow: 0 0 5px #ff007b; }
+        .author span { color: #ff007b; font-weight: 900; }
+
+        .score-board { text-align: right; color: #00f2ff; font-size: 28px; font-weight: 900; text-shadow: 0 0 15px #00f2ff; position: absolute; top: 15px; right: 15px; }
+        .high-score { font-size: 14px; color: #ff007b; display: block; text-shadow: 0 0 5px #ff007b; }
+        
+        .game-over-screen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); padding: 40px; border-radius: 20px; text-align: center; border: 3px solid #ff007b; box-shadow: 0 0 50px rgba(255, 0, 123, 0.5); pointer-events: auto; min-width: 280px; }
+        .game-over-screen h1 { font-size: 40px; color: #ff007b; text-shadow: 0 0 20px #ff007b; margin: 0; }
+        .new-record-msg { color: #00f2ff; font-size: 20px; font-weight: bold; margin: 10px 0; display: none; text-shadow: 0 0 10px #00f2ff; animation: flash 0.5s infinite; }
+        
+        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        button { background: none; border: 2px solid #00f2ff; color: #00f2ff; padding: 12px 25px; font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+        button:hover { background: #00f2ff; color: #000; box-shadow: 0 0 20px #00f2ff; }
     </style>
 </head>
 <body>
 
-    <div class="score">XAL: <span id="scoreVal">0</span></div>
+    <div class="ui-container">
+        <div class="author">QURUCU: <span>OMAR ALIYEV</span></div>
+        <div class="score-board">
+            XAL: <span id="scoreVal">0</span>
+            <span class="high-score">REKORD: <span id="highScoreVal">0</span></span>
+        </div>
+    </div>
+
+    <div class="game-over-screen" id="gameOverScreen">
+        <h1 id="gameOverTitle">OYUN BİTDİ!</h1>
+        <div id="newRecordMsg" class="new-record-msg">🎊 TƏBRİKLƏR! YENİ REKORD! 🎊</div>
+        <p>Sənin xalın: <span id="finalScore">0</span></p>
+        <p>Ən yaxşı xal: <span id="bestScore">0</span></p>
+        <button onclick="resetGame()">YENİDƏN BAŞLA</button>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
-        canvas.width = window.innerWidth > 500 ? 500 : window.innerWidth;
-        canvas.height = 400;
+        function resize() {
+            canvas.width = window.innerWidth > 600 ? 600 : window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
 
         let score = 0;
+        let highScore = localStorage.getItem("motoHighScore") || 0;
+        document.getElementById("highScoreVal").innerText = highScore;
+
         let gameActive = true;
-        let speed = 5;
-
-        // Oyunçu (Kvadrat)
-        const player = {
-            x: 50,
-            y: canvas.height - 50,
-            size: 30,
-            dy: 0,
-            jumpForce: 12,
-            gravity: 0.6,
-            grounded: true,
-            color: "#00f2ff"
-        };
-
-        // Maneələr
+        let speed = 6;
+        let gameFrame = 0;
         const obstacles = [];
+
+        const player = { x: 50, y: canvas.height - 70, width: 60, height: 40, dy: 0, jumpForce: 15, gravity: 0.8, grounded: true };
 
         function spawnObstacle() {
             if(!gameActive) return;
-            obstacles.push({
-                x: canvas.width,
-                y: canvas.height - 40,
-                width: 20,
-                height: 40,
-                color: "#ff007b"
-            });
-            let nextSpawn = Math.random() * (2000 - 1000) + 1000;
-            setTimeout(spawnObstacle, nextSpawn / (speed / 5));
+            obstacles.push({ x: canvas.width, y: canvas.height - 45, width: 25, height: 45 });
+            setTimeout(spawnObstacle, Math.random() * (2000 - 1000) + 1000 / (speed/6));
         }
 
         function update() {
             if (!gameActive) return;
+            gameFrame++;
 
-            // Fizika
             if (!player.grounded) {
                 player.dy += player.gravity;
                 player.y += player.dy;
             }
 
-            if (player.y > canvas.height - player.size) {
-                player.y = canvas.height - player.size;
+            if (player.y > canvas.height - 55) {
+                player.y = canvas.height - 55;
                 player.grounded = true;
                 player.dy = 0;
             }
 
-            // Maneələrin hərəkəti
             obstacles.forEach((obs, index) => {
                 obs.x -= speed;
-
-                // Toqquşma yoxlanışı
-                if (
-                    player.x < obs.x + obs.width &&
-                    player.x + player.size > obs.x &&
-                    player.y < obs.y + obs.height &&
-                    player.y + player.size > obs.y
-                ) {
+                if (player.x < obs.x + obs.width && player.x + player.width > obs.x && player.y < obs.y + obs.height && player.y + player.height > obs.y) {
                     gameOver();
                 }
-
                 if (obs.x + obs.width < 0) {
                     obstacles.splice(index, 1);
                     score++;
                     document.getElementById("scoreVal").innerText = score;
-                    if (score % 5 === 0) speed += 0.5; // Hər 5 xaldan bir sürətlənir
+                    if(score % 5 === 0) speed += 0.5;
                 }
             });
 
@@ -97,47 +111,45 @@
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Yol
+            ctx.shadowBlur = 10; ctx.shadowColor = "#00f2ff";
+            ctx.fillStyle = "#00f2ff";
+            ctx.fillRect(0, canvas.height - 10, canvas.width, 10);
 
-            // Oyunçunu çək (Neon effekti)
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = player.color;
-            ctx.fillStyle = player.color;
-            ctx.fillRect(player.x, player.y, player.size, player.size);
+            // Moto (Sadələşdirilmiş neon dizayn)
+            ctx.shadowColor = "#00f2ff"; ctx.strokeStyle = "#00f2ff"; ctx.lineWidth = 3;
+            ctx.strokeRect(player.x, player.y, player.width, player.height);
+            ctx.shadowColor = "#ff007b"; ctx.strokeStyle = "#ff007b";
+            ctx.beginPath(); ctx.arc(player.x + 10, player.y + 35, 10, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(player.x + 50, player.y + 35, 10, 0, Math.PI*2); ctx.stroke();
 
-            // Maneələri çək
-            ctx.shadowColor = "#ff007b";
-            ctx.fillStyle = "#ff007b";
-            obstacles.forEach(obs => {
-                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-            });
-            ctx.shadowBlur = 0;
-        }
-
-        function jump() {
-            if (player.grounded && gameActive) {
-                player.dy = -player.jumpForce;
-                player.grounded = false;
-            }
-            if (!gameActive) location.reload(); // Öləndən sonra toxunanda yenidən başlayır
+            // Maneə
+            ctx.shadowColor = "#ff007b"; ctx.fillStyle = "#ff007b";
+            obstacles.forEach(obs => ctx.fillRect(obs.x, obs.y, obs.width, obs.height));
         }
 
         function gameOver() {
             gameActive = false;
-            ctx.fillStyle = "white";
-            ctx.font = "30px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText("OYUN BİTDİ!", canvas.width / 2, canvas.height / 2);
-            ctx.font = "15px Arial";
-            ctx.fillText("Yenidən başlamaq üçün toxun", canvas.width / 2, canvas.height / 2 + 40);
+            const isNewRecord = score > highScore;
+            if (isNewRecord) {
+                highScore = score;
+                localStorage.setItem("motoHighScore", highScore);
+                document.getElementById("newRecordMsg").style.display = "block";
+            }
+            
+            document.getElementById("gameOverScreen").style.display = "block";
+            document.getElementById("finalScore").innerText = score;
+            document.getElementById("bestScore").innerText = highScore;
         }
 
-        // İdarəetmə
-        window.addEventListener("keydown", (e) => { if(e.code === "Space") jump(); });
-        window.addEventListener("touchstart", jump);
-        window.addEventListener("mousedown", jump);
+        function resetGame() { location.reload(); }
+        window.addEventListener("keydown", (e) => { if(e.code === "Space" && player.grounded) { player.dy = -player.jumpForce; player.grounded = false; } });
+        canvas.addEventListener("touchstart", () => { if(player.grounded) { player.dy = -player.jumpForce; player.grounded = false; } });
 
         spawnObstacle();
         update();
     </script>
 </body>
+</html>
 </html>
