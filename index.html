@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Neon Jump - Mənim Oyunum</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { border-bottom: 4px solid #00f2ff; background: #050505; box-shadow: 0 0 20px rgba(0, 242, 255, 0.2); }
+        .score { position: absolute; top: 20px; color: #00f2ff; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #00f2ff; }
+    </style>
+</head>
+<body>
+
+    <div class="score">XAL: <span id="scoreVal">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        canvas.width = window.innerWidth > 500 ? 500 : window.innerWidth;
+        canvas.height = 400;
+
+        let score = 0;
+        let gameActive = true;
+        let speed = 5;
+
+        // Oyunçu (Kvadrat)
+        const player = {
+            x: 50,
+            y: canvas.height - 50,
+            size: 30,
+            dy: 0,
+            jumpForce: 12,
+            gravity: 0.6,
+            grounded: true,
+            color: "#00f2ff"
+        };
+
+        // Maneələr
+        const obstacles = [];
+
+        function spawnObstacle() {
+            if(!gameActive) return;
+            obstacles.push({
+                x: canvas.width,
+                y: canvas.height - 40,
+                width: 20,
+                height: 40,
+                color: "#ff007b"
+            });
+            let nextSpawn = Math.random() * (2000 - 1000) + 1000;
+            setTimeout(spawnObstacle, nextSpawn / (speed / 5));
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            // Fizika
+            if (!player.grounded) {
+                player.dy += player.gravity;
+                player.y += player.dy;
+            }
+
+            if (player.y > canvas.height - player.size) {
+                player.y = canvas.height - player.size;
+                player.grounded = true;
+                player.dy = 0;
+            }
+
+            // Maneələrin hərəkəti
+            obstacles.forEach((obs, index) => {
+                obs.x -= speed;
+
+                // Toqquşma yoxlanışı
+                if (
+                    player.x < obs.x + obs.width &&
+                    player.x + player.size > obs.x &&
+                    player.y < obs.y + obs.height &&
+                    player.y + player.size > obs.y
+                ) {
+                    gameOver();
+                }
+
+                if (obs.x + obs.width < 0) {
+                    obstacles.splice(index, 1);
+                    score++;
+                    document.getElementById("scoreVal").innerText = score;
+                    if (score % 5 === 0) speed += 0.5; // Hər 5 xaldan bir sürətlənir
+                }
+            });
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Oyunçunu çək (Neon effekti)
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = player.color;
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+
+            // Maneələri çək
+            ctx.shadowColor = "#ff007b";
+            ctx.fillStyle = "#ff007b";
+            obstacles.forEach(obs => {
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            });
+            ctx.shadowBlur = 0;
+        }
+
+        function jump() {
+            if (player.grounded && gameActive) {
+                player.dy = -player.jumpForce;
+                player.grounded = false;
+            }
+            if (!gameActive) location.reload(); // Öləndən sonra toxunanda yenidən başlayır
+        }
+
+        function gameOver() {
+            gameActive = false;
+            ctx.fillStyle = "white";
+            ctx.font = "30px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("OYUN BİTDİ!", canvas.width / 2, canvas.height / 2);
+            ctx.font = "15px Arial";
+            ctx.fillText("Yenidən başlamaq üçün toxun", canvas.width / 2, canvas.height / 2 + 40);
+        }
+
+        // İdarəetmə
+        window.addEventListener("keydown", (e) => { if(e.code === "Space") jump(); });
+        window.addEventListener("touchstart", jump);
+        window.addEventListener("mousedown", jump);
+
+        spawnObstacle();
+        update();
+    </script>
+</body>
+</html>
