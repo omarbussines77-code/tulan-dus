@@ -6,34 +6,47 @@
     <title>Neon Moto Rider - Omar Aliyev</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;900&display=swap');
+        
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Orbitron', sans-serif; touch-action: none; }
         canvas { display: block; }
-        .ui { position: absolute; width: 100%; top: 20px; padding: 0 20px; box-sizing: border-box; pointer-events: none; display: flex; justify-content: space-between; align-items: flex-start; }
-        .author { color: #ff007b; font-size: 12px; text-shadow: 0 0 10px #ff007b; }
+
+        /* UI Elementləri */
+        .ui { position: absolute; width: 100%; top: 20px; padding: 0 20px; box-sizing: border-box; pointer-events: none; display: flex; justify-content: space-between; z-index: 5; }
+        .author { color: #ff007b; font-size: 14px; text-shadow: 0 0 10px #ff007b; line-height: 1.2; }
+        .author span { color: #fff; font-size: 10px; opacity: 0.8; display: block; }
         .score-box { text-align: right; color: #00f2ff; text-shadow: 0 0 10px #00f2ff; }
-        .record { font-size: 14px; color: #ff007b; opacity: 0.8; }
+        .record { font-size: 14px; color: #ff007b; opacity: 0.8; margin-top: 5px; }
+
+        /* Oyun Sonu Ekranı */
+        .game-over { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); padding: 40px; border: 3px solid #00f2ff; border-radius: 20px; text-align: center; color: #fff; z-index: 10; box-shadow: 0 0 50px rgba(0, 242, 255, 0.4); min-width: 280px; }
+        .game-over h1 { margin: 0; color: #ff007b; text-shadow: 0 0 20px #ff007b; font-size: 32px; }
+        .congrats { color: #00f2ff; font-size: 18px; margin: 15px 0; display: none; animation: pulse 0.5s infinite; text-shadow: 0 0 10px #00f2ff; }
+        .stats { margin: 20px 0; font-size: 20px; }
         
-        .game-over { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 40px; border: 2px solid #ff007b; border-radius: 20px; text-align: center; color: #fff; z-index: 10; box-shadow: 0 0 50px #ff007b; }
-        button { background: #00f2ff; border: none; padding: 12px 30px; font-family: 'Orbitron'; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 20px; }
-        .new-record { color: #00f2ff; animation: blink 0.5s infinite; display: none; margin-bottom: 10px; }
-        @keyframes blink { 50% { opacity: 0; } }
+        button { background: #00f2ff; border: none; padding: 15px 40px; font-family: 'Orbitron'; font-weight: 900; border-radius: 5px; cursor: pointer; transition: 0.3s; color: #000; text-transform: uppercase; }
+        button:hover { background: #fff; box-shadow: 0 0 20px #fff; }
+
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
     </style>
 </head>
 <body>
 
     <div class="ui">
-        <div class="author">DEVELOPER: <br><strong>OMAR ALIYEV</strong></div>
+        <div class="author"><span>DEVELOPER:</span><strong>OMAR ALIYEV</strong></div>
         <div class="score-box">
-            <div style="font-size: 30px;">XAL: <span id="score">0</span></div>
+            <div style="font-size: 28px;">XAL: <span id="score">0</span></div>
             <div class="record">REKORD: <span id="highScore">0</span></div>
         </div>
     </div>
 
     <div class="game-over" id="gameOver">
-        <div id="recordLabel" class="new-record">YENİ REKORD!</div>
-        <h1>GAME OVER</h1>
-        <p>Xalın: <span id="finalScore">0</span></p>
-        <button onclick="location.reload()">YENİDƏN BAŞLA</button>
+        <h1 id="statusText">GAME OVER</h1>
+        <div id="newRecordMsg" class="congrats">🎊 YENİ REKORD! TƏBRİKLƏR! 🎊</div>
+        <div class="stats">
+            <div>Sənin Xalın: <span id="finalScore" style="color:#00f2ff">0</span></div>
+            <div style="font-size: 14px; margin-top: 5px; opacity: 0.7;">Köhnə Rekord: <span id="prevBest">0</span></div>
+        </div>
+        <button onclick="location.reload()">Yenidən Başla</button>
     </div>
 
     <canvas id="game"></canvas>
@@ -41,34 +54,152 @@
     <script>
         const canvas = document.getElementById("game");
         const ctx = canvas.getContext("2d");
-        const scoreEl = document.getElementById("score");
-        const highScoreEl = document.getElementById("highScore");
 
+        // Ölçüləri nizamlamaq
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
+        // Oyun Dəyişənləri
         let score = 0;
-        let highScore = localStorage.getItem("motoRecord") || 0;
-        highScoreEl.innerText = highScore;
+        let highScore = localStorage.getItem("motoRecordOmar") || 0;
+        document.getElementById("highScore").innerText = highScore;
 
         let gameActive = true;
         let speed = 7;
         let obstacles = [];
         let gameFrame = 0;
 
+        // Moto Karakteri
         const moto = {
-            x: 50,
-            y: canvas.height - 100,
-            w: 80,
+            x: 60,
+            y: canvas.height - 110,
+            w: 70,
             h: 40,
             dy: 0,
-            jumpForce: -18,
+            jumpForce: -19,
             gravity: 1,
             grounded: false,
-            rotation: 0, // Animasiya üçün əyilmə dərəcəsi
-            suspension: 0 // Yerə düşəndə yaylanma
+            tilt: 0,
+            bounce: 0
         };
 
         function spawnObstacle() {
             if(!gameActive) return;
-            obstacles.push({ x: canvas.width, y: canvas.height - 50, w: 30, h: 4
+            let h = 40 + Math.random() * 20;
+            obstacles.push({ x: canvas.width, y: canvas.height - 50 - h, w: 25, h: h });
+            let next = Math.max(800, 2000 - (speed * 100));
+            setTimeout(spawnObstacle, next);
+        }
+
+        function drawMoto() {
+            ctx.save();
+            let currentY = moto.y + moto.bounce;
+            ctx.translate(moto.x + moto.w/2, currentY + moto.h/2);
+            ctx.rotate(moto.tilt);
+
+            // Neon İşığı
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#00f2ff";
+            ctx.strokeStyle = "#00f2ff";
+            ctx.lineWidth = 3;
+
+            // Gövdə Dizaynı
+            ctx.beginPath();
+            ctx.moveTo(-25, 5); ctx.lineTo(-10, -15); ctx.lineTo(20, -15); ctx.lineTo(30, 10);
+            ctx.stroke();
+
+            // Təkərlər
+            ctx.shadowColor = "#ff007b";
+            ctx.strokeStyle = "#ff007b";
+            ctx.beginPath(); ctx.arc(-22, 15, 12, 0, Math.PI*2); ctx.stroke(); // Arxa
+            ctx.beginPath(); ctx.arc(22, 15, 12, 0, Math.PI*2); ctx.stroke();  // Ön
+            
+            ctx.restore();
+        }
+
+        function update() {
+            if(!gameActive) return;
+            gameFrame++;
+
+            // Fizika Hesablaması
+            moto.dy += moto.gravity;
+            moto.y += moto.dy;
+
+            if(moto.y > canvas.height - 110) {
+                if(!moto.grounded) moto.bounce = 8; // Yerə dəyəndə yaylanma
+                moto.y = canvas.height - 110;
+                moto.dy = 0;
+                moto.grounded = true;
+                moto.tilt = 0;
+            } else {
+                moto.grounded = false;
+                moto.tilt = Math.min(moto.tilt + 0.02, 0.25); // Havada önə əyilmə
+            }
+
+            moto.bounce *= 0.8; // Yaylanmanı azaldır
+
+            // Maneələr
+            for(let i = obstacles.length - 1; i >= 0; i--) {
+                let o = obstacles[i];
+                o.x -= speed;
+
+                // Toqquşma (Collision)
+                if(moto.x + 10 < o.x + o.w && moto.x + moto.w - 10 > o.x && 
+                   moto.y + 10 < o.y + o.h && moto.y + moto.h - 5 > o.y) {
+                    endGame();
+                }
+
+                if(o.x + o.w < 0) {
+                    obstacles.splice(i, 1);
+                    score++;
+                    document.getElementById("score").innerText = score;
+                    if(score % 5 === 0) speed += 0.6;
+                }
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Neon Yol
+            ctx.shadowBlur = 15; ctx.shadowColor = "#00f2ff";
+            ctx.fillStyle = "#00f2ff";
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 4);
+
+            drawMoto();
+
+            // Maneələr
+            ctx.shadowColor = "#ff007b"; ctx.fillStyle = "#ff007b";
+            obstacles.forEach(o => { ctx.fillRect(o.x, o.y, o.w, o.h); });
+        }
+
+        function jump() {
+            if(moto.grounded && gameActive) {
+                moto.dy = moto.jumpForce;
+                moto.grounded = false;
+                moto.tilt = -0.3; // Tullananda arxanı qaldır
+            }
+        }
+
+        function endGame() {
+            gameActive = false;
+            let prevBest = localStorage.getItem("motoRecordOmar") || 0;
+            document.getElementById("prevBest").innerText = prevBest;
+            document.getElementById("finalScore").innerText = score;
+            
+            if(score > prevBest) {
+                localStorage.setItem("motoRecordOmar", score);
+                document.getElementById("newRecordMsg").style.display = "block";
+                document.getElementById("statusText").innerText = "MÜKƏMMƏL!";
+            }
+            
+            document.getElementById("gameOver").style.display = "block";
+        }
+
+        // İdarəetmə mexanizmi
+        window.addEventListener("keydown", (e) => { if(e.code === "Space") jump(); });
+        window.addEventListener("touchstart", (e) => { jump(); e.preventDefault(); }, {passive:
